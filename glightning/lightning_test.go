@@ -1329,7 +1329,7 @@ func TestFundChannel(t *testing.T) {
 	feeRate := glightning.NewFeeRate(glightning.PerKw, 500)
 	lightning, requestQ, replyQ := startupServer(t)
 	go runServerSide(t, req, resp, replyQ, requestQ)
-	result, err := lightning.FundChannelExt(id, sats, feeRate, false, nil, nil, nil)
+	result, err := lightning.FundChannelExt(id, sats, feeRate, false, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1382,7 +1382,7 @@ func TestFundChannel(t *testing.T) {
 	feeRate = glightning.NewFeeRateByDirective(glightning.PerKb, glightning.Urgent)
 	req = fmt.Sprintf(`{"jsonrpc":"2.0","method":"fundchannel","params":{"amount":"all","announce":false,"feerate":"urgent","id":"%s"},"id":%d}`, id, 4)
 	go runServerSide(t, req, resp, replyQ, requestQ)
-	_, err = lightning.FundChannelExt(id, sats, feeRate, false, nil, nil, nil)
+	_, err = lightning.FundChannelExt(id, sats, feeRate, false, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1399,7 +1399,7 @@ func TestFundChannel(t *testing.T) {
 	feeRate = glightning.NewFeeRateByDirective(glightning.PerKb, glightning.Urgent)
 	req = fmt.Sprintf(`{"jsonrpc":"2.0","method":"fundchannel","params":{"amount":"all","announce":false,"feerate":"urgent","id":"%s","push_msat":"10000msat"},"id":%d}`, id, 5)
 	go runServerSide(t, req, resp, replyQ, requestQ)
-	_, err = lightning.FundChannelExt(id, sats, feeRate, false, nil, msat, nil)
+	_, err = lightning.FundChannelExt(id, sats, feeRate, false, nil, msat, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

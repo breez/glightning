@@ -570,7 +570,7 @@ func TestPlugins(t *testing.T) {
 	amount := glightning.NewSat(10000000)
 	feerate := glightning.NewFeeRate(glightning.PerKw, uint(253))
 	pushSats := glightning.NewMsat(10000)
-	_, err = l2.rpc.FundChannelExt(peerId, amount, feerate, true, nil, pushSats, nil)
+	_, err = l2.rpc.FundChannelExt(peerId, amount, feerate, true, nil, pushSats, nil, nil)
 	check(t, err)
 
 	// wait til the change is onchain
