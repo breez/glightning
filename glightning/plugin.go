@@ -506,10 +506,10 @@ func (ha *HtlcAcceptedEvent) ContinueWithPayload(payload string) *HtlcAcceptedRe
 	}
 }
 
-func (ha *HtlcAcceptedEvent) Fail(failCode uint16) *HtlcAcceptedResponse {
+func (ha *HtlcAcceptedEvent) Fail(failMsg string) *HtlcAcceptedResponse {
 	return &HtlcAcceptedResponse{
-		Result:      _HcFail,
-		FailureCode: &failCode,
+		Result:         _HcFail,
+		FailureMessage: failMsg,
 	}
 }
 
