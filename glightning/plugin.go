@@ -462,6 +462,8 @@ type HtlcAcceptedResponse struct {
 	// Only allowed if result is 'fail', deprecated! check
 	// FailureMessage
 	FailureCode *uint16 `json:"failure_code,omitempty"`
+	// Hex encoded failure message. Replaces FailureCode.
+	FailureMessage string `json:"failure_message,omitempty"`
 	// Only allowed if result is 'resolve'
 	PaymentKey string `json:"payment_key,omitempty"`
 	// Replaces the onion's payload
