@@ -156,7 +156,7 @@ type Htlc struct {
 	Direction    string `json:"direction"`
 	Id           uint64 `json:"id"`
 	MilliSatoshi uint64 `json:"msatoshi"`
-	AmountMsat   string `json:"amount_msat"`
+	AmountMsat   uint64 `json:"amount_msat"`
 	Expiry       uint64 `json:"expiry"`
 	PaymentHash  string `json:"payment_hash"`
 	State        string `json:"state"`
