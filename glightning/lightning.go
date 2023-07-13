@@ -190,11 +190,17 @@ type Peer struct {
 	Logs         []*Log         `json:"log,omitempty"`
 }
 
+type ChannelAlias struct {
+	Remote string `json:"remote"`
+	Local  string `json:"local"`
+}
+
 type PeerChannel struct {
 	State                            string            `json:"state"`
 	ScratchTxId                      string            `json:"scratch_txid"`
 	Owner                            string            `json:"owner"`
 	ShortChannelId                   string            `json:"short_channel_id"`
+	Alias                            ChannelAlias      `json:"alias"`
 	ChannelDirection                 int               `json:"direction"`
 	ChannelId                        string            `json:"channel_id"`
 	FundingTxId                      string            `json:"funding_txid"`
@@ -1610,7 +1616,9 @@ type FundChannelRequest struct {
 	FeeRate  string  `json:"feerate,omitempty"`
 	Announce bool    `json:"announce"`
 	MinConf  *uint16 `json:"minconf,omitempty"`
-	PushMsat Amount  `json:"push_msat,omitempty"`
+	MinDepth *uint16 `json:"mindepth,omitempty"`
+	PushMsat string  `json:"push_msat,omitempty"`
+	Reserve  string  `json:"reserve,omitempty"`
 }
 
 func (r FundChannelRequest) Name() string {
@@ -1618,26 +1626,27 @@ func (r FundChannelRequest) Name() string {
 }
 
 type FundChannelResult struct {
-	FundingTx   string `json:"tx"`
-	FundingTxId string `json:"txid"`
-	ChannelId   string `json:"channel_id"`
+	FundingTx          string `json:"tx"`
+	FundingTxId        string `json:"txid"`
+	FundingTxOutputNum uint16 `json:"outnum"`
+	ChannelId          string `json:"channel_id"`
 }
 
 // Fund channel, defaults to public channel and default feerate.
 func (l *Lightning) FundChannel(id string, amount *Sat) (*FundChannelResult, error) {
-	return l.FundChannelExt(id, amount, nil, true, nil, nil)
+	return l.FundChannelExt(id, amount, nil, true, nil, nil, nil, nil)
 }
 
 func (l *Lightning) FundPrivateChannel(id string, amount *Sat) (*FundChannelResult, error) {
-	return l.FundChannelExt(id, amount, nil, false, nil, nil)
+	return l.FundChannelExt(id, amount, nil, false, nil, nil, nil, nil)
 }
 
 func (l *Lightning) FundChannelAtFee(id string, amount *Sat, feerate *FeeRate) (*FundChannelResult, error) {
-	return l.FundChannelExt(id, amount, feerate, true, nil, nil)
+	return l.FundChannelExt(id, amount, feerate, true, nil, nil, nil, nil)
 }
 
 func (l *Lightning) FundPrivateChannelAtFee(id string, amount *Sat, feerate *FeeRate) (*FundChannelResult, error) {
-	return l.FundChannelExt(id, amount, feerate, false, nil, nil)
+	return l.FundChannelExt(id, amount, feerate, false, nil, nil, nil, nil)
 }
 
 // Fund channel with node {id} using {satoshi} satoshis, with feerate of {feerate}. Uses
@@ -1645,7 +1654,7 @@ func (l *Lightning) FundPrivateChannelAtFee(id string, amount *Sat, feerate *Fee
 // If announce is false, channel announcements will not be sent.
 // can send an optional 'pushMsat', of millisatoshis to push to peer (from your funding amount)
 // Any pushed msats are irrevocably gifted to the peer. (use only if you enjoy being a sats santa!)
-func (l *Lightning) FundChannelExt(id string, amount *Sat, feerate *FeeRate, announce bool, minConf *uint16, pushMSat *MSat) (*FundChannelResult, error) {
+func (l *Lightning) FundChannelExt(id string, amount *Sat, feerate *FeeRate, announce bool, minConf *uint16, pushMSat *MSat, minDepth *uint16, reserve *MSat) (*FundChannelResult, error) {
 	if amount == nil || (amount.Value == 0 && !amount.SendAll) {
 		return nil, fmt.Errorf("Must set satoshi amount to send")
 	}
@@ -1654,12 +1663,17 @@ func (l *Lightning) FundChannelExt(id string, amount *Sat, feerate *FeeRate, ann
 		Id:       id,
 		Amount:   amount.RawString(),
 		Announce: announce,
+		MinDepth: minDepth,
+		MinConf:  minConf,
 	}
 	if feerate != nil {
 		req.FeeRate = feerate.String()
 	}
 	if pushMSat != nil {
-		req.PushMsat = AmountFromMSat(pushMSat.Value)
+		req.PushMsat = pushMSat.String()
+	}
+	if reserve != nil {
+		req.Reserve = reserve.String()
 	}
 	req.MinConf = minConf
 
