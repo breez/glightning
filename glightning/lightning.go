@@ -182,72 +182,16 @@ func (r ListPeersRequest) Name() string {
 }
 
 type Peer struct {
-	Id           string         `json:"id"`
-	Connected    bool           `json:"connected"`
-	NetAddresses []string       `json:"netaddr"`
-	Features     *Hexed         `json:"features"`
-	Channels     []*PeerChannel `json:"channels"`
-	Logs         []*Log         `json:"log,omitempty"`
+	Id           string   `json:"id"`
+	Connected    bool     `json:"connected"`
+	NetAddresses []string `json:"netaddr"`
+	Features     *Hexed   `json:"features"`
+	Logs         []*Log   `json:"log,omitempty"`
 }
 
 type ChannelAlias struct {
 	Remote string `json:"remote"`
 	Local  string `json:"local"`
-}
-
-type PeerChannel struct {
-	State                            string            `json:"state"`
-	ScratchTxId                      string            `json:"scratch_txid"`
-	Owner                            string            `json:"owner"`
-	ShortChannelId                   string            `json:"short_channel_id"`
-	Alias                            ChannelAlias      `json:"alias"`
-	ChannelDirection                 int               `json:"direction"`
-	ChannelId                        string            `json:"channel_id"`
-	FundingTxId                      string            `json:"funding_txid"`
-	CloseToAddress                   string            `json:"close_to_addr,omitempty"`
-	CloseToScript                    string            `json:"close_to,omitempty"`
-	Status                           []string          `json:"status"`
-	Private                          bool              `json:"private"`
-	FundingAllocations               map[string]uint64 `json:"funding_allocation_msat,omitempty"`
-	FundingMsat                      map[string]Amount `json:"funding_msat,omitempty"`
-	MilliSatoshiToUs                 uint64            `json:"msatoshi_to_us,omitempty"`
-	ToUsMsat                         Amount            `json:"to_us_msat"`
-	MilliSatoshiToUsMin              uint64            `json:"msatoshi_to_us_min,omitempty"`
-	MinToUsMsat                      Amount            `json:"min_to_us_msat"`
-	MilliSatoshiToUsMax              uint64            `json:"msatoshi_to_us_max,omitempty"`
-	MaxToUsMsat                      Amount            `json:"max_to_us_msat"`
-	MilliSatoshiTotal                uint64            `json:"msatoshi_total,omitempty"`
-	TotalMsat                        Amount            `json:"total_msat"`
-	DustLimitSatoshi                 uint64            `json:"dust_limit_satoshis"`
-	DustLimitMsat                    Amount            `json:"dust_limit_msat"`
-	MaxHtlcValueInFlightMilliSatoshi uint64            `json:"max_htlc_value_in_flight_msat"`
-	MaxHtlcValueInFlightMsat         Amount            `json:"max_total_htlc_in_msat"`
-	TheirChannelReserveSatoshi       uint64            `json:"their_channel_reserve_satoshis"`
-	TheirReserveMsat                 Amount            `json:"their_reserve_msat"`
-	OurChannelReserveSatoshi         uint64            `json:"our_channel_reserve_satoshis"`
-	OurReserveMsat                   Amount            `json:"our_reserve_msat"`
-	SpendableMilliSatoshi            uint64            `json:"spendable_msatoshi,omitempty"`
-	SpendableMsat                    Amount            `json:"spendable_msat"`
-	ReceivableMilliSatoshi           uint64            `json:"receivable_msatoshi,omitempty"`
-	ReceivableMsat                   Amount            `json:"receivable_msat"`
-	HtlcMinMilliSatoshi              uint64            `json:"htlc_minimum_msat"`
-	MinimumHtlcInMsat                Amount            `json:"minimum_htlc_in_msat"`
-	TheirToSelfDelay                 uint              `json:"their_to_self_delay"`
-	OurToSelfDelay                   uint              `json:"our_to_self_delay"`
-	MaxAcceptedHtlcs                 uint              `json:"max_accepted_htlcs"`
-	InPaymentsOffered                uint64            `json:"in_payments_offered"`
-	InMilliSatoshiOffered            uint64            `json:"in_msatoshi_offered,omitempty"`
-	IncomingOfferedMsat              Amount            `json:"in_offered_msat"`
-	InPaymentsFulfilled              uint64            `json:"in_payments_fulfilled"`
-	InMilliSatoshiFulfilled          uint64            `json:"in_msatoshi_fulfilled,omitempty"`
-	IncomingFulfilledMsat            Amount            `json:"in_fulfilled_msat"`
-	OutPaymentsOffered               uint64            `json:"out_payments_offered"`
-	OutMilliSatoshiOffered           uint64            `json:"out_msatoshi_offered,omitempty"`
-	OutgoingOfferedMsat              Amount            `json:"out_offered_msat"`
-	OutPaymentsFulfilled             uint64            `json:"out_payments_fulfilled"`
-	OutMilliSatoshiFulfilled         uint64            `json:"out_msatoshi_fulfilled,omitempty"`
-	OutgoingFulfilledMsat            Amount            `json:"out_fulfilled_msat"`
-	Htlcs                            []*Htlc           `json:"htlcs"`
 }
 
 type Htlc struct {
@@ -299,6 +243,102 @@ func (l *Lightning) getPeers(peerId string, level LogLevel) ([]*Peer, error) {
 
 	err := l.client.Request(request, &result)
 	return result.Peers, err
+}
+
+type ListPeerChannelsRequest struct {
+	Id *string `json:"id,omitempty"`
+}
+
+func (r ListPeerChannelsRequest) Name() string {
+	return "listpeerchannels"
+}
+
+type ListPeerChannelsResponse struct {
+	Channels []*PeerChannel `json:"channels"`
+}
+
+type ChannelType struct {
+	Bits  []uint32 `json:"bits"`
+	Names []string `json:"names"`
+}
+
+type ChannelFeeRate struct {
+	PerKw uint32 `json:"perkw"`
+	PerKb uint32 `json:"perkb"`
+}
+
+type PeerChannel struct {
+	PeerId                    string         `json:"peer_id"`
+	PeerConnected             bool           `json:"peer_connected"`
+	State                     string         `json:"state"`
+	Opener                    string         `json:"opener"`
+	Features                  []string       `json:"features"`
+	ScratchTxId               string         `json:"scratch_txid"`
+	ChannelType               ChannelType    `json:"channel_type"`
+	IgnoreFeeLimits           bool           `json:"ignore_fee_limits"`
+	FeeRate                   ChannelFeeRate `json:"feerate"`
+	Owner                     string         `json:"owner"`
+	ShortChannelId            string         `json:"short_channel_id"`
+	ChannelId                 string         `json:"channel_id"`
+	FundingTxId               string         `json:"funding_txid"`
+	FundingOutnum             uint32         `json:"funding_outnum"`
+	InitialFeeRate            string         `json:"initial_feerate"`
+	LastFeeRate               string         `json:"last_feerate"`
+	NextFeeRate               string         `json:"next_feerate"`
+	NextFeeStep               uint32         `json:"next_fee_step"`
+	Private                   bool           `json:"private"`
+	Closer                    string         `json:"closer"`
+	ToUsMsat                  Amount         `json:"to_us_msat"`
+	MinToUsMsat               Amount         `json:"min_to_us_msat"`
+	MaxToUsMsat               Amount         `json:"max_to_us_msat"`
+	TotalMsat                 Amount         `json:"total_msat"`
+	FeeBaseMsat               Amount         `json:"fee_base_msat"`
+	FeeProportionalMillionths uint32         `json:"fee_proportional_millionths"`
+	DustLimitMsat             Amount         `json:"dust_limit_msat"`
+	MaxTotalHtlcInMsat        Amount         `json:"max_total_htlc_in_msat"`
+	TheirReserveMsat          Amount         `json:"their_reserve_msat"`
+	OurReserveMsat            Amount         `json:"our_reserve_msat"`
+	SpendableMsat             Amount         `json:"spendable_msat"`
+	ReceivableMsat            Amount         `json:"receivable_msat"`
+	MinimumHtlcInMsat         Amount         `json:"minimum_htlc_in_msat"`
+	MinimumHtlcOutMsat        Amount         `json:"minimum_htlc_out_msat"`
+	MaximumHtlcOutMsat        Amount         `json:"maximum_htlc_out_msat"`
+	TheirToSelfDelay          uint           `json:"their_to_self_delay"`
+	OurToSelfDelay            uint           `json:"our_to_self_delay"`
+	MaxAcceptedHtlcs          uint           `json:"max_accepted_htlcs"`
+	Alias                     *ChannelAlias  `json:"alias,omitempty"`
+	Status                    []string       `json:"status"`
+	InPaymentsOffered         uint64         `json:"in_payments_offered"`
+	InOfferedMsat             Amount         `json:"in_offered_msat"`
+	InPaymentsFulfilled       uint64         `json:"in_payments_fulfilled"`
+	InFulfilledMsat           Amount         `json:"in_fulfilled_msat"`
+	OutPaymentsOffered        uint64         `json:"out_payments_offered"`
+	OutOfferedMsat            Amount         `json:"out_offered_msat"`
+	OutPaymentsFulfilled      uint64         `json:"out_payments_fulfilled"`
+	OutFulfilledMsat          Amount         `json:"out_fulfilled_msat"`
+	Htlcs                     []*Htlc        `json:"htlcs"`
+}
+
+func (l *Lightning) ListPeerChannels() ([]*PeerChannel, error) {
+	var result ListPeerChannelsResponse
+	err := l.client.Request(&ListPeerChannelsRequest{}, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return result.Channels, nil
+}
+
+func (l *Lightning) GetPeerChannels(id string) ([]*PeerChannel, error) {
+	var result ListPeerChannelsResponse
+	err := l.client.Request(&ListPeerChannelsRequest{
+		Id: &id,
+	}, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return result.Channels, nil
 }
 
 type ListNodeRequest struct {
@@ -2280,7 +2320,26 @@ func (l *Lightning) ListFunds() (*FundsResult, error) {
 	return &result, err
 }
 
-type ListForwardsRequest struct{}
+type ListForwardsRequest struct {
+	// If status is specified, then only the forwards with the given status are
+	// returned. status can be either offered or settled or failed or
+	// local_failed
+	Status     string `json:"status,omitempty"`
+	InChannel  string `json:"in_channel,omitempty"`
+	OutChannel string `json:"out_channel,omitempty"`
+	// If neither in_channel or out_channel is specified,
+	// index controls ordering, by created (default) or updated. If
+	// index is specified, start may be specified to start from that
+	// value, which is generally returned from lightning-wait(7), and limit
+	// can be used to specify the maximum number of entries to return.
+	Index string `json:"index,omitempty"`
+	Start uint64 `json:"start,omitempty"`
+	Limit uint32 `json:"limit,omitempty"`
+}
+
+type ListForwardsRequestIndex struct {
+	Start string `json:"start,omitempty"`
+}
 
 func (r *ListForwardsRequest) Name() string {
 	return "listforwards"
