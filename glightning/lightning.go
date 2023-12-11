@@ -1,6 +1,7 @@
 package glightning
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/elementsproject/glightning/jrpc2"
 )
@@ -103,7 +105,8 @@ func (a AmountOrAny) MarshalJSON() ([]byte, error) {
 // c-lightning RPC commands
 type Lightning struct {
 	client *jrpc2.Client
-	isUp   bool
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 func NewLightning() *Lightning {
@@ -117,31 +120,35 @@ func (l *Lightning) SetTimeout(secs uint) {
 }
 
 func (l *Lightning) StartUp(rpcfile, lightningDir string) error {
-	up := make(chan bool)
-	errChan := make(chan error)
-	go func(l *Lightning, rpcfile, lightningDir string, up chan bool, errChan chan error) {
-		err := l.client.SocketStart(filepath.Join(lightningDir, rpcfile), up)
-		if err != nil {
-			errChan <- err
+	l.ctx, l.cancel = context.WithCancel(context.Background())
+	go func(l *Lightning, rpcfile, lightningDir string, ctx context.Context) {
+		for {
+			err := l.client.SocketStart(filepath.Join(lightningDir, rpcfile))
+			log.Printf("cln socket errored with %v", err)
+			select {
+			case <-ctx.Done():
+				log.Printf("glightning client is shutdown.")
+				return
+			case <-time.After(time.Millisecond * 500):
+				log.Printf("retrying cln connection.")
+			}
 		}
-	}(l, rpcfile, lightningDir, up, errChan)
+	}(l, rpcfile, lightningDir, l.ctx)
 
-	for {
-		select {
-		case l.isUp = <-up:
-			return nil
-		case err := <-errChan:
-			return err
-		}
-	}
+	return nil
 }
 
 func (l *Lightning) Shutdown() {
 	l.client.Shutdown()
+	if l.cancel != nil {
+		l.cancel()
+		l.cancel = nil
+		l.ctx = nil
+	}
 }
 
 func (l *Lightning) IsUp() bool {
-	return l.isUp && l.client.IsUp()
+	return l.ctx != nil && l.ctx.Err() == nil && l.client.IsUp()
 }
 
 func (l *Lightning) Request(m jrpc2.Method, resp interface{}) error {

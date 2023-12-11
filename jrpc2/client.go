@@ -2,6 +2,7 @@ package jrpc2
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -24,50 +25,80 @@ type Client struct {
 	requestQueue   chan *Request
 	pending        sync.Map // map[string]chan *RawResponse
 	requestCounter int64
-	shutdown       bool
+	ctx            context.Context
+	cancel         context.CancelFunc
 	timeout        time.Duration
+	mtx            sync.Mutex
 }
 
 func NewClient() *Client {
 	client := &Client{}
 	client.requestQueue = make(chan *Request)
-	client.timeout = time.Duration(20)
+	client.timeout = time.Duration(20) * time.Second
+	client.ctx, client.cancel = context.WithCancel(context.Background())
+	client.cancel()
 	return client
 }
 
 func (c *Client) SetTimeout(secs uint) {
-	c.timeout = time.Duration(secs)
+	c.mtx.Lock()
+	c.timeout = time.Duration(secs) * time.Second
+	c.mtx.Unlock()
 }
 
 func (c *Client) StartUp(in, out *os.File) {
-	c.shutdown = false
-	go c.setupWriteQueue(out)
-	c.readQueue(in)
+	c.mtx.Lock()
+	requestQueue := c.requestQueue
+	ctx, cancel := context.WithCancel(context.Background())
+	c.ctx, c.cancel = ctx, cancel
+	c.mtx.Unlock()
+	go func(ctx context.Context, requestQueue chan *Request, c *Client) {
+		<-ctx.Done()
+		c.shutdown(requestQueue)
+	}(ctx, requestQueue, c)
+	go setupWriteQueue(ctx, requestQueue, out)
+	c.readQueue(ctx, cancel, in)
 }
 
 // Start up on a socket, instead of using pipes
 // This method blocks. The up channel is an optional
 // channel to receive  notification when the connection is set up
-func (c *Client) SocketStart(socket string, up chan bool) error {
-	c.shutdown = false
+func (c *Client) SocketStart(socket string) error {
+	c.mtx.Lock()
+	requestQueue := c.requestQueue
+	ctx, cancel := context.WithCancel(context.Background())
+	c.ctx, c.cancel = ctx, cancel
+	c.mtx.Unlock()
 	conn, err := net.Dial("unix", socket)
 	if err != nil {
-		return fmt.Errorf("Unable to dial socket %s:%s", socket, err.Error())
+		return fmt.Errorf("unable to dial socket %s:%s", socket, err.Error())
 	}
 	defer conn.Close()
-	go func(conn net.Conn, up chan bool) {
-		if up != nil {
-			up <- true
-		}
-		c.readQueue(conn)
-	}(conn, up)
-	c.setupWriteQueue(conn)
-	return nil
+	go func(ctx context.Context, requestQueue chan *Request, c *Client) {
+		<-ctx.Done()
+		c.shutdown(requestQueue)
+	}(ctx, requestQueue, c)
+	go setupWriteQueue(ctx, requestQueue, conn)
+	return c.readQueue(ctx, cancel, conn)
 }
 
 func (c *Client) Shutdown() {
-	c.shutdown = true
-	close(c.requestQueue)
+	c.mtx.Lock()
+	cancel := c.cancel
+	requestQueue := c.requestQueue
+	c.mtx.Unlock()
+	cancel()
+	c.shutdown(requestQueue)
+}
+
+func (c *Client) shutdown(requestQueue chan *Request) {
+	c.mtx.Lock()
+	defer c.mtx.Unlock()
+	if c.requestQueue == requestQueue {
+		c.requestQueue = make(chan *Request)
+		close(requestQueue)
+	}
+
 	c.pending.Range(func(key, value interface{}) bool {
 		v_chan, ok := value.(chan *RawResponse)
 		if !ok {
@@ -77,18 +108,27 @@ func (c *Client) Shutdown() {
 		c.pending.Delete(key)
 		return true
 	})
-	c.requestQueue = make(chan *Request)
 }
 
 func (c *Client) IsUp() bool {
-	return !c.shutdown
+	ctx := c.ctx
+	return ctx != nil && ctx.Err() == nil
 }
 
-func (c *Client) setupWriteQueue(outW io.Writer) {
+func setupWriteQueue(ctx context.Context, requestQueue chan *Request, outW io.Writer) {
 	out := bufio.NewWriter(outW)
 	defer out.Flush()
 	twoNewlines := []byte("\n\n")
-	for request := range c.requestQueue {
+	for {
+		var request *Request
+		select {
+		case <-ctx.Done():
+			return
+		case request = <-requestQueue:
+		}
+		if request == nil {
+			continue
+		}
 		data, err := json.Marshal(request)
 		if err != nil {
 			// todo: send error back to waiting response
@@ -106,22 +146,22 @@ func (c *Client) setupWriteQueue(outW io.Writer) {
 	}
 }
 
-func (c *Client) readQueue(in io.Reader) {
+func (c *Client) readQueue(ctx context.Context, cancel context.CancelFunc, in io.Reader) error {
 	decoder := json.NewDecoder(in)
-	for !c.shutdown {
+	for ctx.Err() == nil {
 		var rawResp RawResponse
 		if err := decoder.Decode(&rawResp); err == io.EOF {
-			c.Shutdown()
-			break
+			cancel()
+			return err
 		} else if err != nil {
-			log.Print(err.Error())
-			break
+			log.Printf("Read from cln failed with: %v", err)
+			cancel()
+			return err
 		}
 		go processResponse(c, &rawResp)
 	}
 
-	// there's a problem with the input, shutdown
-	c.Shutdown()
+	return ctx.Err()
 }
 
 func processResponse(c *Client, resp *RawResponse) {
@@ -149,9 +189,6 @@ func processResponse(c *Client, resp *RawResponse) {
 // Sends a notification to the server. No response is expected,
 // and no ID is assigned to the request.
 func (c *Client) Notify(m Method) error {
-	if c.shutdown {
-		return fmt.Errorf("Client is shutdown")
-	}
 	req := &Request{nil, m}
 	c.requestQueue <- req
 	return nil
@@ -160,33 +197,33 @@ func (c *Client) Notify(m Method) error {
 // Isses an RPC call. Is blocking. Times out after {timeout}
 // seconds (set on client).
 func (c *Client) Request(m Method, resp interface{}) error {
-	if c.shutdown {
-		return fmt.Errorf("Client is shutdown")
-	}
 	id := c.NextId()
 	// set up to get a response back
 	replyChan := make(chan *RawResponse, 1)
 	c.pending.Store(id.Val(), replyChan)
-
 	// send the request out
 	req := &Request{id, m}
-	c.requestQueue <- req
+
+	timeout := time.After(c.timeout)
+	select {
+	case <-timeout:
+		return fmt.Errorf("request timed out due to blocked request queue")
+	case c.requestQueue <- req:
+		break
+	}
 
 	select {
 	case rawResp := <-replyChan:
 		return handleReply(rawResp, resp)
-	case <-time.After(c.timeout * time.Second):
+	case <-timeout:
 		c.pending.Delete(id.Val())
-		return fmt.Errorf("Request timed out")
+		return fmt.Errorf("request timed out")
 	}
 }
 
 // Hangs until a response comes. Be aware that this may never
 // terminate.
 func (c *Client) RequestNoTimeout(m Method, resp interface{}) error {
-	if c.shutdown {
-		return fmt.Errorf("Client is shutdown")
-	}
 	id := c.NextId()
 	// set up to get a response back
 	replyChan := make(chan *RawResponse, 1)
