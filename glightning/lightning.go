@@ -2550,6 +2550,69 @@ func (l *Lightning) SetChannelFee(id string, baseMsat string, ppm uint32) (*Chan
 	return &result, err
 }
 
+type SpliceInitRequest struct {
+	ChannelId      string `json:"channel_id"`
+	RelativeAmount int64  `json:"relative_amount"`
+	InitialPsbt    string `json:"initialpsbt,omitempty"`
+	FeeratePerKw   uint32 `json:"feerate_per_kw"`
+	ForceFeerate   bool   `json:"force_feerate"`
+}
+
+func (r *SpliceInitRequest) Name() string {
+	return "splice_init"
+}
+
+type SpliceInitResponse struct {
+	Psbt string `json:"psbt"`
+}
+
+func (l *Lightning) SpliceInit(req *SpliceInitRequest) (*SpliceInitResponse, error) {
+	var result SpliceInitResponse
+	err := l.client.Request(req, &result)
+	return &result, err
+}
+
+type SpliceUpdateRequest struct {
+	ChannelId string `json:"channel_id"`
+	Psbt      string `json:"psbt"`
+}
+
+func (r *SpliceUpdateRequest) Name() string {
+	return "splice_update"
+}
+
+type SpliceUpdateResponse struct {
+	Psbt               string `json:"psbt"`
+	CommitmentsSecured bool   `json:"commitments_secured"`
+}
+
+func (l *Lightning) SpliceUpdate(req *SpliceUpdateRequest) (*SpliceUpdateResponse, error) {
+	var result SpliceUpdateResponse
+	err := l.client.Request(req, &result)
+	return &result, err
+}
+
+type SpliceSignedRequest struct {
+	ChannelId string `json:"channel_id"`
+	Psbt      string `json:"psbt"`
+	SignFirst bool   `json:"sign_first"`
+}
+
+func (r *SpliceSignedRequest) Name() string {
+	return "splice_signed"
+}
+
+type SpliceSignedResponse struct {
+	Tx   string `json:"tx"`
+	Txid string `json:"txid"`
+}
+
+func (l *Lightning) SpliceSigned(req *SpliceSignedRequest) (*SpliceSignedResponse, error) {
+	var result SpliceSignedResponse
+	err := l.client.Request(req, &result)
+	return &result, err
+}
+
 type PluginInfo struct {
 	Name   string `json:"name"`
 	Active bool   `json:"active"`
@@ -2706,4 +2769,7 @@ func init() {
 	Lightning_RpcMethods[(&PluginRequest{}).Name()] = func() jrpc2.Method { return new(PluginRequest) }
 	Lightning_RpcMethods[(&SharedSecretRequest{}).Name()] = func() jrpc2.Method { return new(SharedSecretRequest) }
 	Lightning_RpcMethods[(&CustomMessageRequest{}).Name()] = func() jrpc2.Method { return new(CustomMessageRequest) }
+	Lightning_RpcMethods[(&SpliceInitRequest{}).Name()] = func() jrpc2.Method { return new(SpliceInitRequest) }
+	Lightning_RpcMethods[(&SpliceSignedRequest{}).Name()] = func() jrpc2.Method { return new(SpliceSignedRequest) }
+	Lightning_RpcMethods[(&SpliceUpdateRequest{}).Name()] = func() jrpc2.Method { return new(SpliceUpdateRequest) }
 }
