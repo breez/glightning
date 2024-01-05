@@ -1172,6 +1172,13 @@ func (r GetInfoRequest) Name() string {
 	return "getinfo"
 }
 
+type OurFeatures struct {
+	Init    string `json:"init"`
+	Node    string `json:"node"`
+	Channel string `json:"channel"`
+	Invoice string `json:"invoice"`
+}
+
 type NodeInfo struct {
 	Id                         string            `json:"id"`
 	Alias                      string            `json:"alias"`
@@ -1190,6 +1197,7 @@ type NodeInfo struct {
 	LightningDir               string            `json:"lightning-dir"`
 	WarningBitcoinSync         string            `json:"warning_bitcoind_sync,omitempty"`
 	WarningLightningSync       string            `json:"warning_lightningd_sync,omitempty"`
+	OurFeatures                *OurFeatures      `json:"our_features,omitempty"`
 }
 
 func (n *NodeInfo) IsBitcoindSync() bool {
