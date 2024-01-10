@@ -2190,6 +2190,45 @@ func (l *Lightning) SignPSBT(psbt string) (*SignPSBTResponse, error) {
 	return &result, err
 }
 
+type FundPSBTRequest struct {
+	Satoshi          string  `json:"satoshi"`
+	Feerate          string  `json:"feerate,omitempty"`
+	Startweight      uint32  `json:"startweight"`
+	MinConf          *uint32 `json:"minconf,omitempty"`
+	Reserve          *uint32 `json:"reserve,omitempty"`
+	Locktime         *uint32 `json:"locktime,omitempty"`
+	MinWitnessWeight *uint32 `json:"min_witness_weight,omitempty"`
+	ExcessAsChange   *bool   `json:"excess_as_change,omitempty"`
+	NonWrapped       *bool   `json:"nonwrapped,omitempty"`
+}
+
+func (r FundPSBTRequest) Name() string {
+	return "fundpsbt"
+}
+
+type FundPSBTResponse struct {
+	PSBT                 string         `json:"psbt"`
+	FeeratePerKw         uint32         `json:"feerate_per_kw"`
+	EstimatedFinalWeight uint32         `json:"estimated_final_weight"`
+	ExcessMsat           uint64         `json:"excess_msat"`
+	ChangeOutnum         uint32         `json:"change_outnum"`
+	Reservations         []*Reservation `json:"reservations"`
+}
+
+type Reservation struct {
+	Txid            string `json:"txid"`
+	VOut            uint32 `json:"vout"`
+	WasReserved     bool   `json:"was_reserved"`
+	Reserved        bool   `json:"reserved"`
+	ReservedToBlock uint32 `json:"reserved_to_block"`
+}
+
+func (l *Lightning) FundPSBT(req *FundPSBTRequest) (*FundPSBTResponse, error) {
+	var result FundPSBTResponse
+	err := l.client.Request(req, &result)
+	return &result, err
+}
+
 type Utxo struct {
 	TxId  string
 	Index uint
@@ -2780,4 +2819,5 @@ func init() {
 	Lightning_RpcMethods[(&SpliceInitRequest{}).Name()] = func() jrpc2.Method { return new(SpliceInitRequest) }
 	Lightning_RpcMethods[(&SpliceSignedRequest{}).Name()] = func() jrpc2.Method { return new(SpliceSignedRequest) }
 	Lightning_RpcMethods[(&SpliceUpdateRequest{}).Name()] = func() jrpc2.Method { return new(SpliceUpdateRequest) }
+	Lightning_RpcMethods[(&FundPSBTRequest{}).Name()] = func() jrpc2.Method { return new(FundPSBTRequest) }
 }
